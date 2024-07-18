@@ -68,7 +68,7 @@ impl<EvmConfig> EthExecutorProvider<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
-    fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
+    pub fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
     where
         DB: Database<Error = ProviderError>,
     {
