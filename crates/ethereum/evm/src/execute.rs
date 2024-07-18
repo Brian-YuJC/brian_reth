@@ -287,7 +287,7 @@ where
     /// EIP-7685 [requests](Request).
     ///
     /// Returns an error if execution fails.
-    fn execute_without_verification(
+    pub fn execute_without_verification(
         &mut self,
         block: &BlockWithSenders,
         total_difficulty: U256,
