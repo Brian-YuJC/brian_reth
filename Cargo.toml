@@ -342,18 +342,31 @@ reth-trie = { path = "crates/trie/trie" }
 reth-trie-common = { path = "crates/trie/common" }
 reth-trie-parallel = { path = "crates/trie/parallel" }
 
-# revm
-revm = { version = "10.0.0", features = [
+# # revm
+# revm = { version = "10.0.0", features = [
+#     "std",
+#     "secp256k1",
+#     "blst",
+# ], default-features = false }
+# revm-primitives = { version = "5.0.0", features = [
+#     "std",
+# ], default-features = false }
+#revm-inspectors = "0.1"
+
+# revm Ben Modift
+revm = { path = "locals/revm", features = [ #Ben Modify
     "std",
     "secp256k1",
     "blst",
+    "asm-keccak", #Ben Add
 ], default-features = false }
-revm-primitives = { version = "5.0.0", features = [
+revm-primitives = {  path = "locals/primitives", features = [ #Ben Modify
     "std",
+    "asm-keccak", #Ben Add
 ], default-features = false }
-revm-inspectors = "0.1"
+revm-inspectors = { path = "locals/revm-inspectors-0.1.0" }  #Ben Modify
 
-# eth
+# et
 alloy-chains = "0.1.15"
 alloy-primitives = "0.7.2"
 alloy-dyn-abi = "0.7.2"
