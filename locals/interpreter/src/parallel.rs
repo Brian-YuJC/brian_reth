@@ -161,9 +161,9 @@ pub fn print_records() -> thread::JoinHandle<()>{
                         for opcode in message.op_name_list { //Output
                             println!("{}", opcode)
                         }
-                    }
-                    unsafe {
-                        COUNT += 1;
+                        unsafe { //标记提交打印次数
+                            COUNT += 1;
+                        }
                     }
                 }
                 Err(_) => {
