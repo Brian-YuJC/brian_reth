@@ -375,7 +375,11 @@ impl Interpreter {
         }
 
         //Brian Add
-        parallel::OP_CHANNEL.0.send(parallel::OpcodeMsg{op_idx: opcode, run_time: elapsed_time}).unwrap();
+        let tx_result_checking = self.instruction_result.is_ok() || self.instruction_result == InstructionResult::CallOrCreate || self.instruction_result.is_revert();
+        if tx_result_checking{
+            parallel::OP_CHANNEL.0.send(parallel::OpcodeMsg{op_idx: opcode, run_time: elapsed_time}).unwrap();
+        }
+        
 
         // execute instruction. Brian: 为什么这里多了一个 ps:需要注释掉不然会gas limited报错
         //(instruction_table[opcode as usize])(self, host)
