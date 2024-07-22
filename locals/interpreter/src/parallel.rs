@@ -139,6 +139,8 @@ pub fn update_total_op_count_and_time(op_list: [u128; 256], run_time_list: [u128
     // println!("Run time as nanos: {:?}", elapsed_ns);
 }
 
+static mut COUNT: u64 = 0; //Brian Add
+
 //Brian Modify
 pub fn print_records() -> thread::JoinHandle<()>{
     // for (result_op_code, result_op_count) in OP_COUNT_MAP.lock().unwrap().iter() {
@@ -156,9 +158,12 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if message.op_name_list.len() > 0 { //判断BlockMsg是否为空
-                        for opcode in message.op_name_list {
-                        println!("{}", opcode)
+                        for opcode in message.op_name_list { //Output
+                            println!("{}", opcode)
                         }
+                    }
+                    unsafe {
+                        COUNT += 1;
                     }
                 }
                 Err(_) => {
@@ -168,4 +173,18 @@ pub fn print_records() -> thread::JoinHandle<()>{
         }
     });
     print_handler
+}
+
+//Brian Add
+pub fn wait(block_cnt: u64) { //等待执行完毕
+    unsafe {
+        loop {
+            if COUNT == block_cnt {
+                break
+            }
+            if COUNT == block_cnt - 1 { //已经执行完倒数第二个
+                OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0}).unwrap(); //发个信号，将最后一个blockMsg放进管道
+            }
+        }
+    } 
 }
