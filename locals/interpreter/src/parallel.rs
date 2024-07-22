@@ -7,7 +7,7 @@ use crate::OpCode;
 use lazy_static::lazy_static;
 
 
-pub(crate) static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg>, Mutex<mpsc::Receiver<OpcodeMsg>>)> = Lazy::new(|| { //Brian Add
+pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg>, Mutex<mpsc::Receiver<OpcodeMsg>>)> = Lazy::new(|| { //Brian Add
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
@@ -155,12 +155,14 @@ pub fn print_records() -> thread::JoinHandle<()>{
             };
             match print_message {
                 Ok(message) => {
-                    for opcode in message.op_name_list {
+                    if message.op_name_list.len() > 0 { //判断BlockMsg是否为空
+                        for opcode in message.op_name_list {
                         println!("{}", opcode)
+                        }
                     }
                 }
                 Err(_) => {
-
+                    break;
                 }
             }
         }
