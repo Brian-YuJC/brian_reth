@@ -178,12 +178,14 @@ pub fn print_records() -> thread::JoinHandle<()>{
 //Brian Add
 pub fn wait(block_cnt: u64) { //等待执行完毕
     unsafe {
+        let mut do_send: bool = false;
         loop {
             if COUNT == block_cnt {
                 break
             }
-            if COUNT == block_cnt - 1 { //已经执行完倒数第二个
+            if COUNT == block_cnt - 1 && !do_send { //已经执行完倒数第二个
                 OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0}).unwrap(); //发个信号，将最后一个blockMsg放进管道
+                do_send = true;
             }
         }
     } 
