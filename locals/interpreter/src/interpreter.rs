@@ -377,7 +377,7 @@ impl Interpreter {
         //Brian Add
         let tx_result_checking = self.instruction_result.is_ok() || self.instruction_result == InstructionResult::CallOrCreate || self.instruction_result.is_revert();
         if tx_result_checking{
-            parallel::OP_CHANNEL.0.send(parallel::OpcodeMsg{op_idx: opcode, run_time: elapsed_time, writer_path: None::<&String>.unwrap()}).unwrap();
+            parallel::OP_CHANNEL.0.send(parallel::OpcodeMsg{op_idx: opcode, run_time: elapsed_time, writer_path: None}).unwrap();
         }
         
 

@@ -22,14 +22,14 @@ pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg<'_>>, Mutex<mpsc::Receiver
 pub struct OpcodeMsg<'a> { 
     pub op_idx: u8,
     pub run_time: u128,
-    pub writer_path: &'a String,
+    pub writer_path: Option<&'a String>,
 }
 
 //Brian Add
 pub struct BlockMsg<'b> { 
     pub block_num: u128,
     pub op_time_map: HashMap<&'static str, Vec<u128>>,
-    pub write_path: &'b String,
+    pub write_path: Option<&'b String>,
 
     //pub op_name_list: Vec<&'a str>,
     //pub run_time_list: Vec<u128>,
@@ -72,10 +72,12 @@ pub fn start_channel() -> thread::JoinHandle<()> {
     //     let mut file = OpenOptions::new().append(true).open(WRITE_PATH).expect("Can not open file!");
     // }
 
+    let t = String::new();
     let mut block_msg: BlockMsg<'_> = BlockMsg{
         block_num: 0,
         op_time_map: HashMap::new(),
-        write_path: None::<&String>.unwrap(),
+        //write_path: None::<&String>.unwrap(), //fix to WRITE_PATH_VEC.last().unwarp?
+        write_path: None,
         //op_name_list: Vec::new(),
         //run_time_list: Vec::new(),
     }; //Brian Add
@@ -96,7 +98,7 @@ pub fn start_channel() -> thread::JoinHandle<()> {
                         block_msg = BlockMsg{ //新建新块的消息实例
                             block_num: message.run_time,
                             op_time_map: HashMap::new(),
-                            write_path: message.writer_path,
+                            write_path: Some(message.writer_path.unwrap()),
                             //op_name_list: Vec::new(),
                             //run_time_list: Vec::new(),
                         };
@@ -198,14 +200,14 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
-                        let file = OpenOptions::new().append(true).open(message.write_path);
+                        let file = OpenOptions::new().append(true).open(message.write_path.unwrap());
                         let mut f;
                         match file {
                             Ok(obj) => {
                                 f = obj;
                             }
                             Err(_) => {
-                                f = File::create_new(message.write_path).unwrap();
+                                f = File::create_new(message.write_path.unwrap()).unwrap();
                             }
                         }
                         //println!("BlockNumber {}", message.block_num);
@@ -240,7 +242,7 @@ pub fn wait(block_cnt: u64) { //等待执行完毕
     unsafe {
         loop {
             if COUNT == block_cnt - 1 { //已经执行完倒数第二个
-                OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0, writer_path: None::<&String>.unwrap()}).unwrap(); //发个信号，将最后一个blockMsg放进管道
+                OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0, writer_path: None}).unwrap(); //发个信号，将最后一个blockMsg放进管道
                 loop {
                     if COUNT == block_cnt {
                         return;
