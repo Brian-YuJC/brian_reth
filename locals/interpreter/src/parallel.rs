@@ -177,12 +177,13 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
-                        println!("BlockNumber: {}", message.block_num);
+                        println!("BlockNumber {}", message.block_num);
                         for (k, v) in message.op_time_map { //Output
                             print!("{}", k);
                             for op_time in v {
                                 print!(" {}", op_time);
                             }
+                            print!("\n");
                         }
                         unsafe { //标记提交打印次数
                             COUNT += 1;
