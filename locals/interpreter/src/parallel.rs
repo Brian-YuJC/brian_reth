@@ -1,43 +1,56 @@
-use core::str;
-use std::{fs::File, sync::mpsc::RecvError, thread};
+use core::{borrow::Borrow, ptr::null, str};
+use std::{fmt::format, fs::{File, OpenOptions}, io::Write, path, sync::mpsc::RecvError, thread};
 use revm_primitives::{alloy_primitives::Sealable, HashMap};
 use once_cell::sync::Lazy;
 use std::sync::{mpsc, Mutex};
-use crate::OpCode;
+use crate::{opcode::make_instruction_table, OpCode};
 use lazy_static::lazy_static;
 
-
-pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg>, Mutex<mpsc::Receiver<OpcodeMsg>>)> = Lazy::new(|| { //Brian Add
+//Brian Add
+pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg<'_>>, Mutex<mpsc::Receiver<OpcodeMsg<'_>>>)> = Lazy::new(|| { 
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
 
-pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg>, Mutex<mpsc::Receiver<BlockMsg>>)> = Lazy::new(|| { //Brian Add
+//Brian Add
+pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg<'_>>, Mutex<mpsc::Receiver<BlockMsg<'_>>>)> = Lazy::new(|| { 
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
 
-pub struct OpcodeMsg { // Brian Add
+// Brian Add
+pub struct OpcodeMsg<'a> { 
     pub op_idx: u8,
     pub run_time: u128,
-    //pub writer_ptr: File,
+    pub writer_path: &'a String,
 }
 
-pub struct BlockMsg { //Brian Add
+//Brian Add
+pub struct BlockMsg<'b> { 
     pub block_num: u128,
     pub op_time_map: HashMap<&'static str, Vec<u128>>,
-    //pub write_ptr: File,
+    pub write_path: &'b String,
 
     //pub op_name_list: Vec<&'a str>,
     //pub run_time_list: Vec<u128>,
 }
 
 //pub static mut WRITE_FILE: &File = *File::create("./tmp").unwrap();
-lazy_static! { //Brian Add
-    pub static ref WRITE_PATH: String = String::new();
-}
 
-
+// lazy_static! { //Brian Add
+//     pub static ref WRITE_PATH: String = String::new();
+// }
+//Brian Add
+//pub static mut WRITE_PATH: &String = &String::new();
+// pub static mut WRITE_FILE: Lazy<File> = Lazy::new(|| {
+//     //File::create_new("./output/0.txt").unwrap()
+//     None::<File>.unwrap()
+// });
+// pub static mut WRITE_FILE: Lazy<(File, String)> = Lazy::new(|| {
+//     (None::<File>.unwrap(), String::new())
+// });
+//pub static mut WRITE_PATH: &String = &String::new();
+pub static mut WRITE_PATH_VEC: Vec<String> = Vec::<String>::new();
  
 // 使用 lazy_static 来创建一个全局的 HashMap，并用 Mutex 封装
 lazy_static! {
@@ -55,12 +68,18 @@ static CHANNEL: Lazy<(mpsc::Sender<(u8, u128, u128)>, Mutex<mpsc::Receiver<(u8, 
 
 pub fn start_channel() -> thread::JoinHandle<()> {
 
-    let mut block_msg: BlockMsg = BlockMsg{
+    // unsafe {
+    //     let mut file = OpenOptions::new().append(true).open(WRITE_PATH).expect("Can not open file!");
+    // }
+
+    let mut block_msg: BlockMsg<'_> = BlockMsg{
         block_num: 0,
         op_time_map: HashMap::new(),
+        write_path: None::<&String>.unwrap(),
         //op_name_list: Vec::new(),
         //run_time_list: Vec::new(),
     }; //Brian Add
+    
 
     //Brian Modify
     let log_handle: thread::JoinHandle<()> = thread::spawn(|| { // 启动一个线程来处理日志
@@ -77,6 +96,7 @@ pub fn start_channel() -> thread::JoinHandle<()> {
                         block_msg = BlockMsg{ //新建新块的消息实例
                             block_num: message.run_time,
                             op_time_map: HashMap::new(),
+                            write_path: message.writer_path,
                             //op_name_list: Vec::new(),
                             //run_time_list: Vec::new(),
                         };
@@ -158,7 +178,8 @@ pub fn update_total_op_count_and_time(op_list: [u128; 256], run_time_list: [u128
     // println!("Run time as nanos: {:?}", elapsed_ns);
 }
 
-static mut COUNT: u64 = 0; //Brian Add
+//Brian Add
+static mut COUNT: u64 = 0; //已输出的block数量
 
 //Brian Modify
 pub fn print_records() -> thread::JoinHandle<()>{
@@ -177,13 +198,28 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
-                        println!("BlockNumber {}", message.block_num);
-                        for (k, v) in message.op_time_map { //Output
-                            print!("{}", k);
-                            for op_time in v {
-                                print!(" {}", op_time);
+                        let file = OpenOptions::new().append(true).open(message.write_path);
+                        let mut f;
+                        match file {
+                            Ok(obj) => {
+                                f = obj;
                             }
-                            print!("\n");
+                            Err(_) => {
+                                f = File::create_new(message.write_path).unwrap();
+                            }
+                        }
+                        //println!("BlockNumber {}", message.block_num);
+                        f.write(format!("BlockNumber {}", message.block_num).as_bytes()).unwrap();
+
+                        for (k, v) in message.op_time_map { //Output
+                            //print!("{}", k);
+                            f.write(format!("{}", k).as_bytes()).unwrap();
+                            for op_time in v {
+                                //print!(" {}", op_time);
+                                f.write(format!(" {}", op_time).as_bytes()).unwrap();
+                            }
+                            //print!("\n");
+                            f.write(String::from("\n").as_bytes()).unwrap();
                         }
                         unsafe { //标记提交打印次数
                             COUNT += 1;
@@ -204,7 +240,7 @@ pub fn wait(block_cnt: u64) { //等待执行完毕
     unsafe {
         loop {
             if COUNT == block_cnt - 1 { //已经执行完倒数第二个
-                OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0}).unwrap(); //发个信号，将最后一个blockMsg放进管道
+                OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0, writer_path: None::<&String>.unwrap()}).unwrap(); //发个信号，将最后一个blockMsg放进管道
                 loop {
                     if COUNT == block_cnt {
                         return;

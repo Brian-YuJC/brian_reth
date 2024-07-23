@@ -19,12 +19,13 @@ use reth_primitives::{
 };
 use reth_prune_types::PruneModes;
 use reth_revm::{
-    batch::{BlockBatchRecord, BlockExecutorStats},
-    db::states::bundle_state::BundleRetention,
+    batch::{BlockBatchRecord, BlockExecutorStats}, 
+    db::states::bundle_state::BundleRetention, 
+    interpreter::parallel, 
     state_change::{
         apply_beacon_root_contract_call, apply_blockhashes_update,
         apply_withdrawal_requests_contract_call, post_block_balance_increments,
-    },
+    }, 
     Evm, State,
 };
 use revm_primitives::{
@@ -301,7 +302,7 @@ where
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
 
             //Brian Add
-            reth_revm::interpreter::parallel::OP_CHANNEL.0.send(reth_revm::interpreter::parallel::OpcodeMsg{op_idx: 0xCC, run_time: block.number as u128}).unwrap();
+            reth_revm::interpreter::parallel::OP_CHANNEL.0.send(reth_revm::interpreter::parallel::OpcodeMsg{op_idx: 0xCC, run_time: block.number as u128, writer_path: unsafe { parallel::WRITE_PATH_VEC.last().unwrap() }}).unwrap();
 
             self.executor.execute_state_transitions(block, evm)
         }?;
