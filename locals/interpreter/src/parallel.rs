@@ -12,7 +12,7 @@ pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg>, Mutex<mpsc::Receiver<Opcod
     (sender, Mutex::new(receiver))
 });
 
-pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg<'_>>, Mutex<mpsc::Receiver<BlockMsg<'_>>>)> = Lazy::new(|| { //Brian Add
+pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg>, Mutex<mpsc::Receiver<BlockMsg>>)> = Lazy::new(|| { //Brian Add
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
@@ -23,10 +23,13 @@ pub struct OpcodeMsg { // Brian Add
     //pub writer_ptr: File,
 }
 
-pub struct BlockMsg<'a> { //Brian Add
-    pub op_name_list: Vec<&'a str>,
-    pub run_time_list: Vec<u128>,
+pub struct BlockMsg { //Brian Add
+    pub block_num: u128,
+    pub op_time_map: HashMap<&'static str, Vec<u128>>,
     //pub write_ptr: File,
+
+    //pub op_name_list: Vec<&'a str>,
+    //pub run_time_list: Vec<u128>,
 }
 
 //pub static mut WRITE_FILE: &File = *File::create("./tmp").unwrap();
@@ -52,9 +55,11 @@ static CHANNEL: Lazy<(mpsc::Sender<(u8, u128, u128)>, Mutex<mpsc::Receiver<(u8, 
 
 pub fn start_channel() -> thread::JoinHandle<()> {
 
-    let mut block_msg: BlockMsg<'_> = BlockMsg{
-        op_name_list: Vec::new(),
-        run_time_list: Vec::new(),
+    let mut block_msg: BlockMsg = BlockMsg{
+        block_num: 0,
+        op_time_map: HashMap::new(),
+        //op_name_list: Vec::new(),
+        //run_time_list: Vec::new(),
     }; //Brian Add
 
     //Brian Modify
@@ -70,13 +75,27 @@ pub fn start_channel() -> thread::JoinHandle<()> {
                     if message.op_idx == 0xCC { //0xCC还没对应的opcode，可以拿来做新Block标识，运行到0xCC表示开始运行新块
                         PRINT_CHANNEL.0.send(block_msg).unwrap(); //将旧blockmsg实例放入打印管道，等候被打印
                         block_msg = BlockMsg{ //新建新块的消息实例
-                            op_name_list: Vec::new(),
-                            run_time_list: Vec::new(),
+                            block_num: message.run_time,
+                            op_time_map: HashMap::new(),
+                            //op_name_list: Vec::new(),
+                            //run_time_list: Vec::new(),
                         };
                     }
                     else { //往blockMsg实例里填opcode
-                        block_msg.op_name_list.push(OpCode::new(message.op_idx).unwrap().as_str());
-                        block_msg.run_time_list.push(message.run_time);
+                        let opcode_str = OpCode::new(message.op_idx).unwrap().as_str();
+                        let value = block_msg.op_time_map.get_mut(opcode_str); //区分get_mut 和 get 
+                        match value {
+                            Some(vec) => {
+                                vec.push(message.run_time);
+                            }
+                            None => {
+                                let mut vec: Vec<u128> = Vec::new();
+                                vec.push(message.run_time);
+                                block_msg.op_time_map.insert(OpCode::new(message.op_idx).unwrap().as_str(), vec);
+                            }
+                        }
+                        //block_msg.op_name_list.push(OpCode::new(message.op_idx).unwrap().as_str());
+                        //block_msg.run_time_list.push(message.run_time);
                     }
                 }
                 Err(_) => { // 当发送端关闭时，退出循环
@@ -157,9 +176,13 @@ pub fn print_records() -> thread::JoinHandle<()>{
             };
             match print_message {
                 Ok(message) => {
-                    if message.op_name_list.len() > 0 { //判断BlockMsg是否为空
-                        for opcode in message.op_name_list { //Output
-                            println!("{}", opcode)
+                    if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
+                        println!("BlockNumber: {}", message.block_num);
+                        for (k, v) in message.op_time_map { //Output
+                            print!("{}", k);
+                            for op_time in v {
+                                print!(" {}", op_time);
+                            }
                         }
                         unsafe { //标记提交打印次数
                             COUNT += 1;
