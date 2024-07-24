@@ -1,5 +1,5 @@
 use core::{borrow::Borrow, ptr::null, str};
-use std::{fmt::format, fs::{File, OpenOptions}, io::Write, path, sync::mpsc::RecvError, thread};
+use std::{fmt::format, fs::{File, OpenOptions}, io::Write, path, sync::{mpsc::RecvError, RwLock}, thread};
 use revm_primitives::{alloy_primitives::Sealable, HashMap};
 use once_cell::sync::Lazy;
 use std::sync::{mpsc, Mutex};
@@ -197,7 +197,7 @@ pub fn update_total_op_count_and_time(op_list: [u128; 256], run_time_list: [u128
 }
 
 //Brian Add
-static mut COUNT: u64 = 0; //已输出的block数量
+static mut COUNT: RwLock<u64> = RwLock::<u64>::new(0); //已输出的block数量
 
 //Brian Modify
 pub fn print_records() -> thread::JoinHandle<()>{
@@ -246,7 +246,7 @@ pub fn print_records() -> thread::JoinHandle<()>{
                         }
                         f.flush().unwrap();
                         unsafe { //标记提交打印次数
-                            COUNT += 1;
+                            *COUNT.write().unwrap() += 1;
                         }
                     }
                 }
@@ -263,10 +263,10 @@ pub fn print_records() -> thread::JoinHandle<()>{
 pub fn wait(block_cnt: u64) { //等待执行完毕
     unsafe {
         loop {
-            if COUNT == block_cnt - 1 { //已经执行完倒数第二个
+            if *COUNT.read().unwrap() == block_cnt - 1 { //已经执行完倒数第二个
                 OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0, writer_path: None}).unwrap(); //发个信号，将最后一个blockMsg放进管道
                 loop {
-                    if COUNT == block_cnt {
+                    if *COUNT.read().unwrap() == block_cnt {
                         thread::sleep(core::time::Duration::from_secs(3));
                         return;
                     }
