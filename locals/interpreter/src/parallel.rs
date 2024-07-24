@@ -7,29 +7,29 @@ use crate::{opcode::make_instruction_table, OpCode};
 use lazy_static::lazy_static;
 
 //Brian Add
-pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg<'_>>, Mutex<mpsc::Receiver<OpcodeMsg<'_>>>)> = Lazy::new(|| { 
+pub static OP_CHANNEL: Lazy<(mpsc::Sender<OpcodeMsg>, Mutex<mpsc::Receiver<OpcodeMsg>>)> = Lazy::new(|| { 
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
 
 //Brian Add
-pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg<'_>>, Mutex<mpsc::Receiver<BlockMsg<'_>>>)> = Lazy::new(|| { 
+pub static PRINT_CHANNEL: Lazy<(mpsc::Sender<BlockMsg>, Mutex<mpsc::Receiver<BlockMsg>>)> = Lazy::new(|| { 
     let (sender, receiver) = mpsc::channel();
     (sender, Mutex::new(receiver))
 });
 
 // Brian Add
-pub struct OpcodeMsg<'a> { 
+pub struct OpcodeMsg { 
     pub op_idx: u8,
     pub run_time: u128,
-    pub writer_path: Option<&'a String>,
+    pub writer_path: Option<usize>,
 }
 
 //Brian Add
-pub struct BlockMsg<'b> { 
+pub struct BlockMsg { 
     pub block_num: u128,
     pub op_time_map: HashMap<&'static str, Vec<u128>>,
-    pub write_path: Option<&'b String>,
+    pub write_path: Option<usize>, //may be change to vec index
 
     //pub op_name_list: Vec<&'a str>,
     //pub run_time_list: Vec<u128>,
@@ -72,8 +72,7 @@ pub fn start_channel() -> thread::JoinHandle<()> {
     //     let mut file = OpenOptions::new().append(true).open(WRITE_PATH).expect("Can not open file!");
     // }
 
-    let t = String::new();
-    let mut block_msg: BlockMsg<'_> = BlockMsg{
+    let mut block_msg: BlockMsg = BlockMsg{
         block_num: 0,
         op_time_map: HashMap::new(),
         //write_path: None::<&String>.unwrap(), //fix to WRITE_PATH_VEC.last().unwarp?
@@ -200,18 +199,18 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
-                        let file = OpenOptions::new().append(true).open(message.write_path.unwrap());
+                        let file = OpenOptions::new().append(true).open(unsafe { &WRITE_PATH_VEC[message.write_path.unwrap()] });
                         let mut f;
                         match file {
                             Ok(obj) => {
                                 f = obj;
                             }
                             Err(_) => {
-                                f = File::create_new(message.write_path.unwrap()).unwrap();
+                                f = File::create_new(unsafe { &WRITE_PATH_VEC[message.write_path.unwrap()] }).unwrap();
                             }
                         }
                         //println!("BlockNumber {}", message.block_num);
-                        f.write(format!("BlockNumber {}", message.block_num).as_bytes()).unwrap();
+                        f.write(format!("BlockNumber {}\n", message.block_num).as_bytes()).unwrap();
 
                         for (k, v) in message.op_time_map { //Output
                             //print!("{}", k);
