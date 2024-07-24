@@ -50,7 +50,7 @@ pub struct BlockMsg {
 //     (None::<File>.unwrap(), String::new())
 // });
 //pub static mut WRITE_PATH: &String = &String::new();
-pub static mut WRITE_PATH_VEC: Vec<String> = Vec::<String>::new();
+pub static mut WRITE_PATH_VEC: Vec<Mutex<File>> = Vec::<Mutex<File>>::new();
  
 // 使用 lazy_static 来创建一个全局的 HashMap，并用 Mutex 封装
 lazy_static! {
@@ -216,16 +216,21 @@ pub fn print_records() -> thread::JoinHandle<()>{
             match print_message {
                 Ok(message) => {
                     if /*message.op_name_list.len() > 0*/ message.block_num > 0 { //判断BlockMsg是否为空
-                        let file = OpenOptions::new().append(true).open(unsafe { &WRITE_PATH_VEC[message.write_path.unwrap()] });
-                        let mut f;
-                        match file {
-                            Ok(obj) => {
-                                f = obj;
-                            }
-                            Err(_) => {
-                                f = File::create_new(unsafe { &WRITE_PATH_VEC[message.write_path.unwrap()] }).unwrap();
-                            }
-                        }
+                        // let path_lock = unsafe { &WRITE_PATH_VEC[message.write_path.unwrap()] };
+                        // let path_guard1 = path_lock.lock().unwrap();
+                        // let path_guard2 = path_lock.lock().unwrap();
+                        // let file = OpenOptions::new().append(true).open(*path_guard1);
+                        // let mut f;
+                        // match file {
+                        //     Ok(obj) => {
+                        //         f = obj;
+                        //     }
+                        //     Err(_) => {
+                        //         //f = File::create_new(*path_guard2).unwrap();
+                        //     }
+                        // }
+                        let f_gard = unsafe { WRITE_PATH_VEC[message.write_path.unwrap()].lock().unwrap()};
+                        let mut f = f_gard;
                         //println!("BlockNumber {}", message.block_num);
                         f.write(format!("BlockNumber {}\n", message.block_num).as_bytes()).unwrap();
 
