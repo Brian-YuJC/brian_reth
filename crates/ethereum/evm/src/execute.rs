@@ -302,7 +302,7 @@ where
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
 
             //Brian Add
-            reth_revm::interpreter::parallel::OP_CHANNEL.0.send(reth_revm::interpreter::parallel::OpcodeMsg{op_idx: 0xCC, run_time: block.number as u128, writer_path: unsafe { Some(parallel::WRITE_PATH_VEC.len() as usize) }}).unwrap();
+            reth_revm::interpreter::parallel::OP_CHANNEL.0.send(reth_revm::interpreter::parallel::OpcodeMsg{op_idx: 0xCC, run_time: block.number as u128, writer_path: unsafe { Some(parallel::WRITE_PATH_VEC.len()-1 as usize) }}).unwrap();
 
             self.executor.execute_state_transitions(block, evm)
         }?;

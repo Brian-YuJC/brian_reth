@@ -93,11 +93,28 @@ pub fn start_channel() -> thread::JoinHandle<()> {
             match log_message {
                 Ok(message) => {
                     if message.op_idx == 0xCC { //0xCC还没对应的opcode，可以拿来做新Block标识，运行到0xCC表示开始运行新块
-                        PRINT_CHANNEL.0.send(block_msg).unwrap(); //将旧blockmsg实例放入打印管道，等候被打印
+                        // PRINT_CHANNEL.0.send(block_msg).unwrap(); //将旧blockmsg实例放入打印管道，等候被打印
+                        // block_msg = BlockMsg{ //新建新块的消息实例
+                        //     block_num: message.run_time,
+                        //     op_time_map: HashMap::new(),
+                        //     write_path: Some(message.writer_path.unwrap()),
+                        //     //op_name_list: Vec::new(),
+                        //     //run_time_list: Vec::new(),
+                        // };
+                        let write_path: Option<usize>;
+                        PRINT_CHANNEL.0.send(block_msg).unwrap();
+                        match message.writer_path {
+                            Some(val) => {
+                                write_path = Some(val);
+                            }
+                            None => {
+                                write_path = None;
+                            }
+                        }
                         block_msg = BlockMsg{ //新建新块的消息实例
                             block_num: message.run_time,
                             op_time_map: HashMap::new(),
-                            write_path: Some(message.writer_path.unwrap()),
+                            write_path: write_path,
                             //op_name_list: Vec::new(),
                             //run_time_list: Vec::new(),
                         };
@@ -222,6 +239,7 @@ pub fn print_records() -> thread::JoinHandle<()>{
                             //print!("\n");
                             f.write(String::from("\n").as_bytes()).unwrap();
                         }
+                        f.flush().unwrap();
                         unsafe { //标记提交打印次数
                             COUNT += 1;
                         }
@@ -244,6 +262,7 @@ pub fn wait(block_cnt: u64) { //等待执行完毕
                 OP_CHANNEL.0.send(OpcodeMsg{op_idx: 0xCC, run_time: 0, writer_path: None}).unwrap(); //发个信号，将最后一个blockMsg放进管道
                 loop {
                     if COUNT == block_cnt {
+                        thread::sleep(core::time::Duration::from_secs(3));
                         return;
                     }
                 }
