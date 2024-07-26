@@ -50,7 +50,7 @@ pub struct BlockMsg {
 //     (None::<File>.unwrap(), String::new())
 // });
 //pub static mut WRITE_PATH: &String = &String::new();
-pub static mut WRITE_PATH_VEC: Vec<Mutex<File>> = Vec::<Mutex<File>>::new();
+pub static mut WRITE_PATH_VEC: Vec<Mutex<String>> = Vec::new();
  
 // 使用 lazy_static 来创建一个全局的 HashMap，并用 Mutex 封装
 lazy_static! {
@@ -229,24 +229,33 @@ pub fn print_records() -> thread::JoinHandle<()>{
                         //         //f = File::create_new(*path_guard2).unwrap();
                         //     }
                         // }
-                        let f_gard = unsafe { WRITE_PATH_VEC[message.write_path.unwrap()].lock().unwrap()};
-                        let mut f = f_gard;
-                        //println!("BlockNumber {}", message.block_num);
-                        f.write(format!("BlockNumber {}\n", message.block_num).as_bytes()).unwrap();
 
-                        for (k, v) in message.op_time_map { //Output
-                            //print!("{}", k);
-                            f.write(format!("{}", k).as_bytes()).unwrap();
-                            for op_time in v {
-                                //print!(" {}", op_time);
-                                f.write(format!(" {}", op_time).as_bytes()).unwrap();
+                        let f_lock_res = unsafe { WRITE_PATH_VEC[message.write_path.unwrap()].lock()};
+                        //添加判断，如果有其他线程在当前blockMsg相同地址进行输出，则将当前blockMsg再次推入管道
+                        match f_lock_res{
+                            Ok(f_gard) => { //没有被占用，进行追加写入操作
+                                let mut f = OpenOptions::new().append(true).open(f_gard.clone()).unwrap();
+                                //println!("BlockNumber {}", message.block_num);
+                                f.write(format!("BlockNumber {}\n", message.block_num).as_bytes()).unwrap();
+
+                                for (k, v) in message.op_time_map { //Output
+                                    //print!("{}", k);
+                                    f.write(format!("{}", k).as_bytes()).unwrap();
+                                    for op_time in v {
+                                        //print!(" {}", op_time);
+                                        f.write(format!(" {}", op_time).as_bytes()).unwrap();
+                                    }
+                                    //print!("\n");
+                                    f.write(String::from("\n").as_bytes()).unwrap();
+                                }
+                                f.flush().unwrap();
+                                unsafe { //标记提交打印次数
+                                    *COUNT.write().unwrap() += 1;
+                                }
                             }
-                            //print!("\n");
-                            f.write(String::from("\n").as_bytes()).unwrap();
-                        }
-                        f.flush().unwrap();
-                        unsafe { //标记提交打印次数
-                            *COUNT.write().unwrap() += 1;
+                            Err(_) => { //冲突，推入管道
+                                PRINT_CHANNEL.0.send(message).unwrap();
+                            }
                         }
                     }
                 }
