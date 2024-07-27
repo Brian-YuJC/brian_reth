@@ -200,14 +200,14 @@ pub fn update_total_op_count_and_time(op_list: [u128; 256], run_time_list: [u128
 static mut COUNT: RwLock<u64> = RwLock::<u64>::new(0); //已输出的block数量
 
 //Brian Modify
-pub fn print_records() -> thread::JoinHandle<()>{
+pub fn print_records(thread_id: u64) -> thread::JoinHandle<()>{
     // for (result_op_code, result_op_count) in OP_COUNT_MAP.lock().unwrap().iter() {
     //     let result_op_code_str = *result_op_code;
     //     let result_op_count_str = *result_op_count;
     //     let result_op_total_run_time = *OP_TIME_MAP.lock().unwrap().get(result_op_code).unwrap();
     //     println!("Opcode name is: {:?}. Run time as nanos: {:?}. Total Count is: {:?}", result_op_code_str, result_op_total_run_time, result_op_count_str);
     // }
-    let print_handler: thread::JoinHandle<()> = thread::spawn(|| {
+    let print_handler: thread::JoinHandle<()> = thread::spawn(move || {
         loop {
             let print_message = {
                 let receiver = PRINT_CHANNEL.1.lock().unwrap();
@@ -251,6 +251,7 @@ pub fn print_records() -> thread::JoinHandle<()>{
                                 f.flush().unwrap();
                                 unsafe { //标记提交打印次数
                                     *COUNT.write().unwrap() += 1;
+                                    eprintln!("Thread {}. Done {}", thread_id, *COUNT.read().unwrap());
                                 }
                             }
                             Err(_) => { //冲突，推入管道
