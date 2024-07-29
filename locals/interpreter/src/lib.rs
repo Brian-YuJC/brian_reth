@@ -43,10 +43,5 @@ pub use interpreter_action::{
 pub use opcode::{Instruction, OpCode, OPCODE_INFO_JUMPTABLE};
 pub use primitives::{MAX_CODE_SIZE, MAX_INITCODE_SIZE};
 
-//Ben Add
-pub use parallel::{
-    start_channel, update_total_op_count_and_time, print_records
-};
-
 #[doc(hidden)]
 pub use revm_primitives as primitives;

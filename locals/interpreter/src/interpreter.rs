@@ -13,8 +13,7 @@ use crate::parallel; //Brian Add
 use crate::{
     gas, primitives::Bytes, push, push_b256, return_ok, return_revert, CallOutcome, CreateOutcome,
     FunctionStack, Gas, Host, InstructionResult, InterpreterAction, 
-    update_total_op_count_and_time
-}; //Ben Add:update_total_op_count_and_time
+};
 use core::cmp::min;
 
 use revm_primitives::{Bytecode, Eof, U256};
@@ -64,9 +63,6 @@ pub struct Interpreter {
     /// Set inside CALL or CREATE instructions and RETURN or REVERT instructions. Additionally those instructions will set
     /// InstructionResult to CallOrCreate/Return/Revert so we know the reason.
     pub next_action: InterpreterAction,
-
-    pub op_count_list: [u128; 256], //Ben Add 
-    pub op_time_list: [u128; 256], //Ben Add 
 }
 
 impl Default for Interpreter {
@@ -97,8 +93,6 @@ impl Interpreter {
             shared_memory: EMPTY_SHARED_MEMORY,
             stack: Stack::new(),
             next_action: InterpreterAction::None,
-            op_count_list: [0; 256], //Ben Add 
-            op_time_list: [0; 256], //Ben Add 
         }
     }
 
@@ -366,13 +360,6 @@ impl Interpreter {
         (instruction_table[opcode as usize])(self, host);
         // let end = Instant::now();
         let elapsed_time = start.elapsed().as_nanos();
-        //Ben Add 
-        let tx_result_checking = self.instruction_result.is_ok() || self.instruction_result == InstructionResult::CallOrCreate || self.instruction_result.is_revert();
-        if tx_result_checking {
-            let op_idx = opcode as usize;
-            self.op_count_list[op_idx] += 1;
-            self.op_time_list[op_idx] += elapsed_time;
-        }
 
         //Brian Add
         let tx_result_checking = self.instruction_result.is_ok() || self.instruction_result == InstructionResult::CallOrCreate || self.instruction_result.is_revert();
@@ -380,9 +367,6 @@ impl Interpreter {
             parallel::OP_CHANNEL.0.send(parallel::OpcodeMsg{op_idx: opcode, run_time: elapsed_time, writer_path: None}).unwrap();
         }
         
-
-        // execute instruction. Brian: 为什么这里多了一个 ps:需要注释掉不然会gas limited报错
-        //(instruction_table[opcode as usize])(self, host)
     }
 
     /// Take memory and replace it with empty memory.
@@ -406,13 +390,6 @@ impl Interpreter {
         while self.instruction_result == InstructionResult::Continue {
             self.step(instruction_table, host);
         }
-
-        //Ben Add extra, record time
-        let op_count_list_copy = self.op_count_list.clone();
-        let op_time_list_copy = self.op_time_list.clone();
-        update_total_op_count_and_time(op_count_list_copy, op_time_list_copy);
-        self.op_count_list = [0; 256];
-        self.op_time_list = [0; 256];
 
         // Return next action if it is some.
         if self.next_action.is_some() {
